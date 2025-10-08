@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from zoneinfo import ZoneInfo  # Changed from pytz
+from zoneinfo import ZoneInfo
 import calendar
 import json
 from pathlib import Path
@@ -18,12 +18,16 @@ if not DATA_FILE.exists():
     with open(DATA_FILE, 'w') as f:
         json.dump([], f)
 
+# Initialize session state
+if 'form_key' not in st.session_state:
+    st.session_state.form_key = 0
+
 # Helper functions
 def get_day_name(date_obj):
     return calendar.day_name[date_obj.weekday()]
 
 def get_ist_timestamp():
-    ist = ZoneInfo('Asia/Kolkata')  # Changed from pytz
+    ist = ZoneInfo('Asia/Kolkata')
     return datetime.now(ist).strftime("%d-%m-%Y %I:%M:%S %p")
 
 def load_entries():
@@ -42,9 +46,8 @@ def save_entries(entries):
 def add_entry(entry):
     """Add a new entry"""
     entries = load_entries()
-    # Add unique ID based on timestamp
     entry['id'] = datetime.now().timestamp()
-    entries.insert(0, entry)  # Add at beginning for most recent first
+    entries.insert(0, entry)
     save_entries(entries)
 
 def delete_entry(entry_id):
@@ -60,7 +63,8 @@ st.markdown("### Your personal trading diary")
 # Simple entry form
 st.subheader("✍️ Write Entry")
 
-with st.form("notebook_form", clear_on_submit=True):
+# Use form_key to force form reset
+with st.form(f"notebook_form_{st.session_state.form_key}", clear_on_submit=True):
     # Date and Time
     col1, col2, col3 = st.columns([1, 1, 1])
     
@@ -72,7 +76,9 @@ with st.form("notebook_form", clear_on_submit=True):
         st.text_input("Day", value=day_name, disabled=True)
     
     with col3:
-        time_input = st.time_input("Time", datetime.now().time())
+        # Get current time for each form render
+        current_time = datetime.now().time()
+        time_input = st.time_input("Time (12-hour format)", current_time)
     
     # News field
     news = st.text_input("📰 News/Events (optional)", placeholder="Any important news or events...")
@@ -95,7 +101,7 @@ with st.form("notebook_form", clear_on_submit=True):
             entry = {
                 "date": date_input.strftime("%d-%m-%Y"),
                 "day": day_name,
-                "time": time_input.strftime("%I:%M %p"),
+                "time": time_input.strftime("%I:%M %p"),  # 12-hour format
                 "news": news,
                 "journal": journal,
                 "saved_at": ist_timestamp
@@ -103,6 +109,8 @@ with st.form("notebook_form", clear_on_submit=True):
             
             add_entry(entry)
             st.success(f"✅ Entry saved at {ist_timestamp} IST")
+            # Increment form key to reset form with new time
+            st.session_state.form_key += 1
             st.rerun()
         else:
             st.error("Please write something in your journal")
@@ -138,7 +146,7 @@ elif view_option == "Last 30 Days":
 if filtered_entries:
     for entry in filtered_entries:
         with st.container():
-            st.markdown(f"### 📅 {entry['date']} - {entry['day']} | {entry['time']}")
+            st.markdown(f"### 📅 {entry['date']} - {entry['day']} | ⏰ {entry['time']}")
             
             if entry.get('news'):
                 st.info(f"**📰 News:** {entry['news']}")
@@ -206,4 +214,5 @@ with st.expander("ℹ️ Data Storage Info"):
     - Entries are automatically saved when you click "Save Entry"
     - You can export your data anytime using the export buttons above
     - The data file persists between app sessions
+    - Times are displayed in 12-hour format (AM/PM)
     """)
