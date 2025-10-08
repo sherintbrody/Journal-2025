@@ -26,6 +26,11 @@ if 'form_key' not in st.session_state:
 def get_day_name(date_obj):
     return calendar.day_name[date_obj.weekday()]
 
+def get_ist_time():
+    """Get current time in IST"""
+    ist = ZoneInfo('Asia/Kolkata')
+    return datetime.now(ist)
+
 def get_ist_timestamp():
     ist = ZoneInfo('Asia/Kolkata')
     return datetime.now(ist).strftime("%d-%m-%Y %I:%M:%S %p")
@@ -69,16 +74,18 @@ with st.form(f"notebook_form_{st.session_state.form_key}", clear_on_submit=True)
     col1, col2, col3 = st.columns([1, 1, 1])
     
     with col1:
-        date_input = st.date_input("Date", datetime.today())
+        # Get IST date
+        ist_now = get_ist_time()
+        date_input = st.date_input("Date", ist_now.date())
     
     with col2:
         day_name = get_day_name(date_input)
         st.text_input("Day", value=day_name, disabled=True)
     
     with col3:
-        # Get current time for each form render
-        current_time = datetime.now().time()
-        time_input = st.time_input("Time (12-hour format)", current_time)
+        # Get current IST time
+        current_ist_time = get_ist_time().time()
+        time_input = st.time_input("Time (IST)", current_ist_time)
     
     # News field
     news = st.text_input("📰 News/Events (optional)", placeholder="Any important news or events...")
@@ -135,7 +142,7 @@ filtered_entries = []
 if view_option == "All":
     filtered_entries = all_entries
 elif view_option == "Today":
-    today = datetime.now().strftime("%d-%m-%Y")
+    today = get_ist_time().strftime("%d-%m-%Y")  # Use IST for today
     filtered_entries = [e for e in all_entries if e.get('date') == today]
 elif view_option == "Last 7 Days":
     filtered_entries = all_entries[:20]
@@ -211,6 +218,7 @@ with st.expander("ℹ️ Data Storage Info"):
     
     **Note:** 
     - Data is stored in JSON format
+    - All times are in IST (Indian Standard Time)
     - Entries are automatically saved when you click "Save Entry"
     - You can export your data anytime using the export buttons above
     - The data file persists between app sessions
