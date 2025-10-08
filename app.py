@@ -188,7 +188,7 @@ if filtered_entries:
                     # Entry header with time
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.markdown(f"### ⏰ Entry #{idx} - {entry['time']}")
+                        st.markdown(f"### ▶   - {entry['time']}")
                     with col2:
                         if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}", use_container_width=True):
                             delete_entry(entry.get('id'))
