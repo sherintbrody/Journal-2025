@@ -188,7 +188,7 @@ if filtered_entries:
                     # Entry header with time
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.markdown(f"### ▶   - {entry['time']}")
+                        st.markdown(f"### ▶    {entry['time']}")
                     with col2:
                         if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}", use_container_width=True):
                             delete_entry(entry.get('id'))
@@ -203,8 +203,7 @@ if filtered_entries:
                     if entry.get('journal'):
                         st.markdown(entry['journal'])
                     
-                    # Show when it was saved
-                    st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
+                    
                     
                     # Separator between entries on same date
                     if idx < len(entries_for_date):
