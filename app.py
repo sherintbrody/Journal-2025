@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import calendar
 import json
 from pathlib import Path
+from collections import defaultdict
 
 st.set_page_config(page_title="Trading Notebook", layout="wide")
 
@@ -60,6 +61,19 @@ def delete_entry(entry_id):
     entries = load_entries()
     entries = [e for e in entries if e.get('id') != entry_id]
     save_entries(entries)
+
+def group_entries_by_date(entries):
+    """Group entries by date, maintaining order"""
+    grouped = defaultdict(list)
+    date_order = []  # To maintain order of dates
+    
+    for entry in entries:
+        date = entry.get('date')
+        if date not in date_order:
+            date_order.append(date)
+        grouped[date].append(entry)
+    
+    return grouped, date_order
 
 # --- Main App ---
 st.title("🗒️ Trading Notebook")
@@ -149,28 +163,56 @@ elif view_option == "Last 7 Days":
 elif view_option == "Last 30 Days":
     filtered_entries = all_entries[:50]
 
-# Display entries
+# Display entries grouped by date
 if filtered_entries:
-    for entry in filtered_entries:
+    # Group entries by date
+    grouped_entries, date_order = group_entries_by_date(filtered_entries)
+    
+    # Display each date group
+    for date in date_order:
+        entries_for_date = grouped_entries[date]
+        
+        # Date header with count
+        entry_count = len(entries_for_date)
+        day_name = entries_for_date[0].get('day', '')
+        
+        st.markdown(f"## 📅 {date} - {day_name}")
+        st.caption(f"💭 {entry_count} {'entry' if entry_count == 1 else 'entries'} on this day")
+        
+        # Container for this date's entries
         with st.container():
-            st.markdown(f"### 📅 {entry['date']} - {entry['day']} | ⏰ {entry['time']}")
+            # Display all entries for this date
+            for idx, entry in enumerate(entries_for_date, 1):
+                # Create a card-like display for each entry
+                with st.container():
+                    # Entry header with time
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"### ⏰ Entry #{idx} - {entry['time']}")
+                    with col2:
+                        if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}", use_container_width=True):
+                            delete_entry(entry.get('id'))
+                            st.success("Entry deleted")
+                            st.rerun()
+                    
+                    # Display news if present
+                    if entry.get('news'):
+                        st.info(f"**📰 News:** {entry['news']}")
+                    
+                    # Display journal entry
+                    if entry.get('journal'):
+                        st.markdown(entry['journal'])
+                    
+                    # Show when it was saved
+                    st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
+                    
+                    # Separator between entries on same date
+                    if idx < len(entries_for_date):
+                        st.markdown("---")
             
-            if entry.get('news'):
-                st.info(f"**📰 News:** {entry['news']}")
-            
-            if entry.get('journal'):
-                st.markdown(entry['journal'])
-            
-            st.caption(f"Saved at: {entry.get('saved_at', 'N/A')} IST")
-            
-            col1, col2, col3 = st.columns([1, 4, 1])
-            with col3:
-                if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}"):
-                    delete_entry(entry.get('id'))
-                    st.success("Entry deleted")
-                    st.rerun()
-            
-            st.divider()
+        # Divider between different dates
+        st.divider()
+        
 else:
     st.info("📭 No entries yet. Start writing your trading diary!")
 
@@ -219,6 +261,7 @@ with st.expander("ℹ️ Data Storage Info"):
     **Note:** 
     - Data is stored in JSON format
     - All times are in IST (Indian Standard Time)
+    - Entries are grouped by date for easy viewing
     - Entries are automatically saved when you click "Save Entry"
     - You can export your data anytime using the export buttons above
     - The data file persists between app sessions
