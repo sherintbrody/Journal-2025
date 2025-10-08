@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import pytz
+from zoneinfo import ZoneInfo  # Changed from pytz
 import calendar
 import json
-import os
 from pathlib import Path
 
 st.set_page_config(page_title="Trading Notebook", layout="wide")
@@ -24,7 +23,7 @@ def get_day_name(date_obj):
     return calendar.day_name[date_obj.weekday()]
 
 def get_ist_timestamp():
-    ist = pytz.timezone('Asia/Kolkata')
+    ist = ZoneInfo('Asia/Kolkata')  # Changed from pytz
     return datetime.now(ist).strftime("%d-%m-%Y %I:%M:%S %p")
 
 def load_entries():
@@ -131,31 +130,24 @@ elif view_option == "Today":
     today = datetime.now().strftime("%d-%m-%Y")
     filtered_entries = [e for e in all_entries if e.get('date') == today]
 elif view_option == "Last 7 Days":
-    # Simple date comparison (you can make this more sophisticated if needed)
-    filtered_entries = all_entries[:20]  # Show last 20 entries as approximation
+    filtered_entries = all_entries[:20]
 elif view_option == "Last 30 Days":
-    filtered_entries = all_entries[:50]  # Show last 50 entries as approximation
+    filtered_entries = all_entries[:50]
 
 # Display entries
 if filtered_entries:
     for entry in filtered_entries:
-        # Create a nice card-like display for each entry
         with st.container():
-            # Header with date and time
             st.markdown(f"### 📅 {entry['date']} - {entry['day']} | {entry['time']}")
             
-            # Display news if present
             if entry.get('news'):
                 st.info(f"**📰 News:** {entry['news']}")
             
-            # Display journal entry
             if entry.get('journal'):
                 st.markdown(entry['journal'])
             
-            # Show when it was saved
             st.caption(f"Saved at: {entry.get('saved_at', 'N/A')} IST")
             
-            # Delete button
             col1, col2, col3 = st.columns([1, 4, 1])
             with col3:
                 if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}"):
@@ -176,7 +168,6 @@ with col1:
         all_entries = load_entries()
         if all_entries:
             df = pd.DataFrame(all_entries)
-            # Remove the ID column for export
             if 'id' in df.columns:
                 df = df.drop('id', axis=1)
             
@@ -194,7 +185,6 @@ with col2:
     if st.button("📥 Export Diary to JSON", use_container_width=True):
         all_entries = load_entries()
         if all_entries:
-            # Create a clean version without IDs for export
             export_entries = [{k: v for k, v in entry.items() if k != 'id'} for entry in all_entries]
             json_str = json.dumps(export_entries, indent=2)
             
@@ -207,7 +197,6 @@ with col2:
         else:
             st.info("No entries to export")
 
-# Show data storage location
 with st.expander("ℹ️ Data Storage Info"):
     st.info(f"""
     Your notebook entries are stored locally in: `{DATA_FILE}`
