@@ -6,6 +6,7 @@ import calendar
 import json
 from pathlib import Path
 from collections import defaultdict
+import re
 
 st.set_page_config(page_title="Trading Notebook", layout="wide")
 
@@ -35,6 +36,30 @@ def get_ist_time():
 def get_ist_timestamp():
     ist = ZoneInfo('Asia/Kolkata')
     return datetime.now(ist).strftime("%d-%m-%Y %I:%M:%S %p")
+
+def format_journal_text(text):
+    """Format journal text: each sentence on a new line"""
+    if not text:
+        return ""
+    
+    # Split by sentence endings (., !, ?) followed by space or end of string
+    # This regex keeps the punctuation with the sentence
+    sentences = re.split(r'([.!?]+(?:\s+|$))', text)
+    
+    # Combine sentences with their punctuation and add line breaks
+    formatted_lines = []
+    for i in range(0, len(sentences)-1, 2):
+        sentence = sentences[i].strip()
+        punctuation = sentences[i+1].strip() if i+1 < len(sentences) else ''
+        if sentence:
+            formatted_lines.append(sentence + punctuation)
+    
+    # Handle last sentence if no punctuation
+    if len(sentences) % 2 == 1 and sentences[-1].strip():
+        formatted_lines.append(sentences[-1].strip())
+    
+    # Join with line breaks
+    return '<br>'.join(formatted_lines)
 
 def load_entries():
     """Load entries from JSON file"""
@@ -104,7 +129,7 @@ st.markdown("""
     }
     .entry-content {
         margin-top: 10px;
-        line-height: 1.6;
+        line-height: 1.8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -227,7 +252,8 @@ with tab1:
                         st.info(f"**📰 News:** {entry['news']}")
                     
                     if entry.get('journal'):
-                        st.markdown(f"<div class='entry-content'>{entry['journal']}</div>", unsafe_allow_html=True)
+                        formatted_journal = format_journal_text(entry['journal'])
+                        st.markdown(f"<div class='entry-content'>{formatted_journal}</div>", unsafe_allow_html=True)
                     
                     st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
             
@@ -296,7 +322,8 @@ with tab2:
                             st.info(f"**📰 News:** {entry['news']}")
                         
                         if entry.get('journal'):
-                            st.markdown(f"<div class='entry-content'>{entry['journal']}</div>", unsafe_allow_html=True)
+                            formatted_journal = format_journal_text(entry['journal'])
+                            st.markdown(f"<div class='entry-content'>{formatted_journal}</div>", unsafe_allow_html=True)
                         
                         st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
                 
@@ -360,6 +387,7 @@ with st.expander("ℹ️ Data Storage Info"):
     **Note:** 
     - Data is stored in JSON format
     - All times are in IST (Indian Standard Time)
+    - Each sentence in your journal will appear on a new line for better readability
     - Entries are grouped by date for easy viewing
     - Use Calendar View to see entries for specific dates
     - Use List View to browse all entries chronologically
