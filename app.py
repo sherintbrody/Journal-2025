@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import calendar
 import json
@@ -75,6 +75,40 @@ def group_entries_by_date(entries):
     
     return grouped, date_order
 
+def get_dates_with_entries():
+    """Get all unique dates that have entries"""
+    all_entries = load_entries()
+    dates = set()
+    for entry in all_entries:
+        dates.add(entry.get('date'))
+    return dates
+
+# Custom CSS for compact boxes
+st.markdown("""
+<style>
+    .entry-box {
+        background-color: #f0f2f6;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 4px solid #1f77b4;
+        margin-bottom: 15px;
+    }
+    .dark-mode .entry-box {
+        background-color: #262730;
+        border-left: 4px solid #58a6ff;
+    }
+    .entry-time {
+        color: #1f77b4;
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+    .entry-content {
+        margin-top: 10px;
+        line-height: 1.6;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- Main App ---
 st.title("🗒️ Trading Notebook")
 st.markdown("### Your personal trading diary")
@@ -141,79 +175,145 @@ st.divider()
 # View entries
 st.subheader("📖 Previous Entries")
 
-# Simple filter
-view_option = st.selectbox(
-    "Show entries from",
-    ["All", "Today", "Last 7 Days", "Last 30 Days"],
-    index=0
-)
+# View options with tabs
+tab1, tab2 = st.tabs(["📅 Calendar View", "📋 List View"])
 
 # Load all entries
 all_entries = load_entries()
 
-# Filter entries based on selection
-filtered_entries = []
-if view_option == "All":
-    filtered_entries = all_entries
-elif view_option == "Today":
-    today = get_ist_time().strftime("%d-%m-%Y")  # Use IST for today
-    filtered_entries = [e for e in all_entries if e.get('date') == today]
-elif view_option == "Last 7 Days":
-    filtered_entries = all_entries[:20]
-elif view_option == "Last 30 Days":
-    filtered_entries = all_entries[:50]
-
-# Display entries grouped by date
-if filtered_entries:
-    # Group entries by date
-    grouped_entries, date_order = group_entries_by_date(filtered_entries)
+with tab1:
+    st.markdown("#### Select a date to view entries")
     
-    # Display each date group
-    for date in date_order:
-        entries_for_date = grouped_entries[date]
+    col1, col2, col3 = st.columns([1, 2, 1])
+    
+    with col1:
+        # Calendar date picker
+        selected_date = st.date_input(
+            "Pick a date",
+            get_ist_time().date(),
+            key="calendar_picker"
+        )
+    
+    with col2:
+        # Show available dates
+        dates_with_entries = get_dates_with_entries()
+        if dates_with_entries:
+            st.info(f"📊 You have entries on {len(dates_with_entries)} different days")
+    
+    # Filter entries for selected date
+    selected_date_str = selected_date.strftime("%d-%m-%Y")
+    calendar_filtered = [e for e in all_entries if e.get('date') == selected_date_str]
+    
+    st.markdown("---")
+    
+    if calendar_filtered:
+        day_name = get_day_name(selected_date)
+        st.markdown(f"### 📅 {selected_date_str} - {day_name}")
+        st.caption(f"💭 {len(calendar_filtered)} {'entry' if len(calendar_filtered) == 1 else 'entries'} on this day")
         
-        # Date header with count
-        entry_count = len(entries_for_date)
-        day_name = entries_for_date[0].get('day', '')
-        
-        st.markdown(f"## 📅 {date} - {day_name}")
-        st.caption(f"💭 {entry_count} {'entry' if entry_count == 1 else 'entries'} on this day")
-        
-        # Container for this date's entries
-        with st.container():
-            # Display all entries for this date
-            for idx, entry in enumerate(entries_for_date, 1):
-                # Create a card-like display for each entry
+        # Display entries in compact boxes
+        for idx, entry in enumerate(calendar_filtered, 1):
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
                 with st.container():
-                    # Entry header with time
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.markdown(f"### ▶    {entry['time']}")
-                    with col2:
-                        if st.button("🗑️ Delete", key=f"delete_{entry.get('id', hash(str(entry)))}", use_container_width=True):
-                            delete_entry(entry.get('id'))
-                            st.success("Entry deleted")
-                            st.rerun()
+                    st.markdown(f"""
+                    <div class="entry-box">
+                        <div class="entry-time">⏰ {entry['time']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    # Display news if present
                     if entry.get('news'):
                         st.info(f"**📰 News:** {entry['news']}")
                     
-                    # Display journal entry
                     if entry.get('journal'):
-                        st.markdown(entry['journal'])
+                        st.markdown(f"<div class='entry-content'>{entry['journal']}</div>", unsafe_allow_html=True)
                     
-                    
-                    
-                    # Separator between entries on same date
-                    if idx < len(entries_for_date):
-                        st.markdown("---")
+                    st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
             
-        # Divider between different dates
-        st.divider()
+            with col2:
+                st.write("")  # Spacing
+                st.write("")  # Spacing
+                if st.button("🗑️ Delete", key=f"cal_delete_{entry.get('id')}", use_container_width=True):
+                    delete_entry(entry.get('id'))
+                    st.success("Entry deleted")
+                    st.rerun()
+            
+            if idx < len(calendar_filtered):
+                st.markdown("---")
+    else:
+        st.info(f"📭 No entries found for {selected_date_str}")
+
+with tab2:
+    # Simple filter
+    view_option = st.selectbox(
+        "Show entries from",
+        ["All", "Today", "Last 7 Days", "Last 30 Days"],
+        index=0
+    )
+    
+    # Filter entries based on selection
+    filtered_entries = []
+    if view_option == "All":
+        filtered_entries = all_entries
+    elif view_option == "Today":
+        today = get_ist_time().strftime("%d-%m-%Y")
+        filtered_entries = [e for e in all_entries if e.get('date') == today]
+    elif view_option == "Last 7 Days":
+        filtered_entries = all_entries[:20]
+    elif view_option == "Last 30 Days":
+        filtered_entries = all_entries[:50]
+    
+    st.markdown("---")
+    
+    # Display entries grouped by date in compact format
+    if filtered_entries:
+        grouped_entries, date_order = group_entries_by_date(filtered_entries)
         
-else:
-    st.info("📭 No entries yet. Start writing your trading diary!")
+        for date in date_order:
+            entries_for_date = grouped_entries[date]
+            entry_count = len(entries_for_date)
+            day_name = entries_for_date[0].get('day', '')
+            
+            st.markdown(f"### 📅 {date} - {day_name}")
+            st.caption(f"💭 {entry_count} {'entry' if entry_count == 1 else 'entries'} on this day")
+            
+            # Display entries in two columns for compact view
+            for idx, entry in enumerate(entries_for_date):
+                # Use columns for compact display
+                col1, col2 = st.columns([4, 1])
+                
+                with col1:
+                    # Compact box for each entry
+                    with st.container():
+                        st.markdown(f"""
+                        <div class="entry-box">
+                            <div class="entry-time">⏰ {entry['time']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if entry.get('news'):
+                            st.info(f"**📰 News:** {entry['news']}")
+                        
+                        if entry.get('journal'):
+                            st.markdown(f"<div class='entry-content'>{entry['journal']}</div>", unsafe_allow_html=True)
+                        
+                        st.caption(f"📝 Saved at: {entry.get('saved_at', 'N/A')} IST")
+                
+                with col2:
+                    st.write("")  # Spacing
+                    st.write("")  # Spacing
+                    if st.button("🗑️ Delete", key=f"list_delete_{entry.get('id')}", use_container_width=True):
+                        delete_entry(entry.get('id'))
+                        st.success("Entry deleted")
+                        st.rerun()
+                
+                if idx < len(entries_for_date) - 1:
+                    st.markdown("---")
+            
+            st.divider()
+    else:
+        st.info("📭 No entries yet. Start writing your trading diary!")
 
 # Export option at the bottom
 st.divider()
@@ -261,6 +361,8 @@ with st.expander("ℹ️ Data Storage Info"):
     - Data is stored in JSON format
     - All times are in IST (Indian Standard Time)
     - Entries are grouped by date for easy viewing
+    - Use Calendar View to see entries for specific dates
+    - Use List View to browse all entries chronologically
     - Entries are automatically saved when you click "Save Entry"
     - You can export your data anytime using the export buttons above
     - The data file persists between app sessions
